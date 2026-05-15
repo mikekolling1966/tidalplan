@@ -10,6 +10,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 import httpx
 from app.config import UKHO_API_KEY, UKHO_BASE_URL
+from app.services.stream_directions import enrich_station
 
 
 def _haversine_km(lat1, lon1, lat2, lon2) -> float:
@@ -51,7 +52,9 @@ async def get_all_stations() -> list[dict]:
     # Try disk cache first
     disk = _load_station_disk_cache()
     if disk:
-        _stations_cache = disk
+        # Re-enrich from disk cache (stream_directions may have been updated
+        # since the cache was written, so always apply enrichment on load)
+        _stations_cache = [enrich_station(s) for s in disk]
         _stations_fetched = True
         return _stations_cache
     if not UKHO_API_KEY:
@@ -66,7 +69,7 @@ async def get_all_stations() -> list[dict]:
             for f in features:
                 props = f.get("properties", {})
                 coords = f.get("geometry", {}).get("coordinates", [None, None])
-                stations.append({
+                station = {
                     "id": props.get("Id"),
                     "name": props.get("Name"),
                     "country": props.get("Country", "GB"),
@@ -74,7 +77,9 @@ async def get_all_stations() -> list[dict]:
                     "lon": coords[0],
                     "source": "ukho",
                     "continuous_heights_available": props.get("ContinuousHeightsAvailable", False),
-                })
+                }
+                enrich_station(station)
+                stations.append(station)
             _stations_cache = stations
             _stations_fetched = True
             _save_station_disk_cache(stations)
