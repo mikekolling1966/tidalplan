@@ -221,7 +221,7 @@ async def analyse_route(
             if angle_diff > 180:
                 angle_diff = 360 - angle_diff
             component = sp * math.cos(math.radians(angle_diff))
-            sname = "cmems" if ssrc == "cmems" else (station.get("name", "?") if station else "none")
+            sname = station.get("name", "?") if station else "none"
 
             eff_speed = max(vessel_speed_knots + component, 0.3)
             leg_hours = dist_nm / eff_speed

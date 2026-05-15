@@ -400,13 +400,10 @@ function renderSortedTable(results) {
     const sc  = scoreBadge(w.score_label);
     const bar = scoreBar(w.score);
     const legInfo = w.legs.map(l => {
-      const dir  = l.stream_component_kt >= 0 ? '↑' : '↓';
-      const src  = l.source === 'cmems'
-        ? '📡 CMEMS model'
-        : l.source && l.source.startsWith('station:')
-          ? `📍 ${l.source.slice(8)}`
-          : l.station || '—';
-      return `Leg ${l.leg}: ${l.distance_nm}nm ${l.heading.toFixed(0)}°  ${dir} ${Math.abs(l.stream_component_kt).toFixed(1)}kt  [${src}]`;
+      const dir    = l.stream_component_kt >= 0 ? '↑' : '↓';
+      const tag    = l.source === 'cmems' ? ' 📡' : '';
+      const stn    = l.station || '—';
+      return `Leg ${l.leg}: ${l.distance_nm}nm ${l.heading.toFixed(0)}°  ${dir} ${Math.abs(l.stream_component_kt).toFixed(1)}kt  (${stn}${tag})`;
     }).join('\n');
     // store original result index for selectRow
     const origIdx = lastResults.results.indexOf(w);
