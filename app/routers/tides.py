@@ -1,8 +1,22 @@
 from fastapi import APIRouter, Query, HTTPException
 from datetime import datetime, timezone, timedelta
-from app.services import ukho, harmonics
+from app.services import ukho, harmonics, cmems
 
 router = APIRouter()
+
+
+@router.get("/cmems/status")
+async def cmems_status():
+    """CMEMS current data cache status — available forecast window and data source."""
+    return cmems.status()
+
+
+@router.post("/cmems/refresh")
+async def cmems_refresh():
+    """Manually trigger a CMEMS forecast download."""
+    import asyncio
+    asyncio.create_task(cmems.download_forecast())
+    return {"message": "CMEMS download started in background"}
 
 
 @router.get("/stations")

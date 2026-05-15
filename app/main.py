@@ -1,13 +1,42 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
+import asyncio
+import logging
 import os
 
 from app.routers import tides, routing, vessel
 
-app = FastAPI(title="Tidal Router", version="1.0.0")
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup: kick off CMEMS data fetch in background; don't block server start."""
+    from app.services import cmems
+
+    async def _startup_fetch():
+        logger.info("Background CMEMS startup fetch beginning…")
+        ok = await cmems.ensure_ready()
+        if ok:
+            logger.info("CMEMS current data ready.")
+        else:
+            logger.warning("CMEMS data unavailable — station-based fallback will be used.")
+
+    # Fire-and-forget: server starts immediately, CMEMS loads in background
+    asyncio.create_task(_startup_fetch())
+    # Also start the periodic 12-hour refresh loop
+    asyncio.create_task(cmems.refresh_loop())
+
+    yield   # app runs here
+
+    logger.info("Shutting down.")
+
+
+app = FastAPI(title="Tidal Router", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

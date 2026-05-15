@@ -58,24 +58,17 @@ def _station_height_rate(station: dict, t: datetime, ukho_events_cache: dict) ->
         return harmonics.height_rate(station, t)
 
 
-def _stream_vector(station: dict, t: datetime, ukho_events_cache: dict) -> tuple[float, float]:
+def _stream_vector_station(station: dict, t: datetime, ukho_events_cache: dict) -> tuple[float, float]:
     """
-    Return (speed_knots, direction_degrees_true) of tidal stream.
-
-    Stream speed is estimated from dh/dt using the admiralty method:
-      speed = K * |dh/dt|
-    where K = max_spring_speed / (tidal_range_spring/2 * 2*pi/T_M2)
-    (for a pure M2 tide with T=12.42 hr, K = 12.42 * max_speed / (pi * range))
-
-    Direction follows flood/ebb from station metadata.
+    Station-based fallback: estimate stream from dh/dt using the Admiralty K-factor
+    method, with flood/ebb direction from the station metadata or atlas lookup table.
     """
     rate = _station_height_rate(station, t, ukho_events_cache)
 
-    spring_range = station.get("spring_range_m", 4.0)
+    spring_range  = station.get("spring_range_m", 4.0)
     max_spring_kt = station.get("spring_max_knots", 1.5)
     T_M2 = 12.42  # hours
 
-    # K factor (kt per m/hr)
     if spring_range > 0:
         K = (T_M2 * max_spring_kt) / (math.pi * spring_range)
     else:
@@ -91,6 +84,35 @@ def _stream_vector(station: dict, t: datetime, ukho_events_cache: dict) -> tuple
     return speed, direction
 
 
+def _stream_vector(lat: float, lon: float, station: Optional[dict],
+                   t: datetime, ukho_events_cache: dict) -> tuple[float, float, str]:
+    """
+    Return (speed_knots, direction_degrees_true, source) of ocean current.
+
+    Priority:
+      1. CMEMS hydrodynamic model — real u/v at the exact leg midpoint (1.5 km grid,
+         hourly, total current = tidal + surge + wind-driven).
+      2. Station-based fallback — dh/dt K-factor + atlas flood/ebb direction.
+
+    source is 'cmems' or 'station:<name>'.
+    """
+    # ── 1. Try CMEMS ──────────────────────────────────────────────────────
+    try:
+        from app.services import cmems
+        result = cmems.get_stream(lat, lon, t)
+        if result is not None:
+            return result[0], result[1], "cmems"
+    except Exception:
+        pass
+
+    # ── 2. Station-based fallback ─────────────────────────────────────────
+    if station:
+        sp, sd = _stream_vector_station(station, t, ukho_events_cache)
+        return sp, sd, f"station:{station.get('name', '?')}"
+
+    return 0.0, 0.0, "none"
+
+
 # ── core walk ────────────────────────────────────────────────────────────────
 
 @dataclass
@@ -103,6 +125,7 @@ class LegResult:
     stream_direction: float
     stream_component: float  # + = fair, - = foul
     station_name: str
+    stream_source: str = "unknown"  # "cmems" or "station:<name>"
 
 
 @dataclass
@@ -192,15 +215,13 @@ async def analyse_route(
             hdg = _bearing(wp_from[0], wp_from[1], wp_to[0], wp_to[1])
             station = leg_stations[i]
 
-            if station:
-                sp, sd = _stream_vector(station, current_time, ukho_events_cache)
-                angle_diff = abs(hdg - sd) % 360
-                if angle_diff > 180:
-                    angle_diff = 360 - angle_diff
-                component = sp * math.cos(math.radians(angle_diff))
-                sname = station.get("name", "?")
-            else:
-                sp, sd, component, sname = 0.0, 0.0, 0.0, "none"
+            mlat, mlon = leg_mids[i]
+            sp, sd, ssrc = _stream_vector(mlat, mlon, station, current_time, ukho_events_cache)
+            angle_diff = abs(hdg - sd) % 360
+            if angle_diff > 180:
+                angle_diff = 360 - angle_diff
+            component = sp * math.cos(math.radians(angle_diff))
+            sname = "cmems" if ssrc == "cmems" else (station.get("name", "?") if station else "none")
 
             eff_speed = max(vessel_speed_knots + component, 0.3)
             leg_hours = dist_nm / eff_speed
@@ -215,6 +236,7 @@ async def analyse_route(
                 stream_direction=round(sd, 1),
                 stream_component=round(component, 2),
                 station_name=sname,
+                stream_source=ssrc,
             ))
 
             if component >= 0:

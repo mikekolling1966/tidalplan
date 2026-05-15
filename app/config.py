@@ -8,6 +8,10 @@ load_dotenv(_env_path)
 UKHO_API_KEY = os.getenv("UKHO_API_KEY", "")
 UKHO_BASE_URL = "https://admiraltyapi.azure-api.net/uktidalapi/api/V1"
 
+# Copernicus Marine Service (CMEMS) — free account at https://marine.copernicus.eu/
+CMEMS_USERNAME = os.getenv("CMEMS_USERNAME", "")
+CMEMS_PASSWORD = os.getenv("CMEMS_PASSWORD", "")
+
 SIGNALK_HOST = os.getenv("SIGNALK_HOST", "localhost")
 SIGNALK_PORT = int(os.getenv("SIGNALK_PORT", "3000"))
 
