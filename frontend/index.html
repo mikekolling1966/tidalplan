@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tidal Router</title>
+<link rel="stylesheet" href="/static/style.css?v=4">
+<!-- Leaflet -->
+<link  rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<header>
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00c9a7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 17l4-8 4 4 4-6 4 10"/><path d="M3 21h18"/>
+  </svg>
+  <h1>Tidal <span>Router</span></h1>
+  <span class="header-status" id="sk-status">Signal K: connecting…</span>
+</header>
+
+<div class="app-body">
+
+  <!-- ── sidebar ──────────────────────────────────────────────────── -->
+  <aside class="sidebar">
+
+    <section>
+      <h2>Route</h2>
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('gpx-input').click()">
+        <div class="dz-icon">🗺️</div>
+        <p>Drop GPX file here or <strong>click to browse</strong></p>
+        <p id="gpx-filename" style="color:#1a6b7a;margin-top:4px;font-weight:600"></p>
+      </div>
+      <input type="file" id="gpx-input" accept=".gpx" style="display:none">
+      <div class="btn-row">
+        <button class="btn btn-ghost btn-sm" onclick="clearRoute()">Clear route</button>
+        <button class="btn btn-ghost btn-sm" onclick="toggleDrawMode()" id="draw-btn">✏️ Draw</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Vessel speed</h2>
+      <label>Speed through water (knots)</label>
+      <input type="number" id="vessel-speed" value="10" min="1" max="30" step="0.5">
+    </section>
+
+    <section>
+      <h2>Departure window to test</h2>
+      <label>From</label>
+      <input type="datetime-local" id="start-dt">
+      <label>To</label>
+      <input type="datetime-local" id="end-dt">
+      <div class="row2">
+        <div>
+          <label>Interval (min)</label>
+          <select id="interval">
+            <option value="15">15 min</option>
+            <option value="30" selected>30 min</option>
+            <option value="60">1 hour</option>
+          </select>
+        </div>
+        <div>
+          <label>Top results</label>
+          <select id="top-n">
+            <option value="10">10</option>
+            <option value="20" selected>20</option>
+            <option value="50">50</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <button class="btn btn-accent" id="analyse-btn" onclick="runAnalysis()">
+        ⚓ Find Best Departure
+      </button>
+    </section>
+
+    <section>
+      <h2>Tidal stations shown</h2>
+      <div>
+        <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer">
+          <input type="checkbox" id="show-ukho" checked onchange="toggleStationLayer()">
+          <span style="color:#1a6b7a">●</span> UKHO (UK)
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer;margin-top:4px">
+          <input type="checkbox" id="show-ticon" checked onchange="toggleStationLayer()">
+          <span style="color:#e67e22">●</span> TICON-4 (FR/NL/BE)
+        </label>
+      </div>
+    </section>
+
+  </aside>
+
+  <!-- ── map + results ─────────────────────────────────────────────── -->
+  <div class="map-panel">
+    <div id="map"></div>
+
+    <div class="results-panel">
+      <div class="results-header">
+        <h3>Departure Windows</h3>
+        <span class="results-meta" id="results-meta">No analysis run yet</span>
+        <button class="btn btn-ghost btn-sm" onclick="exportResults()" id="export-btn" style="display:none">
+          ↓ Export CSV
+        </button>
+      </div>
+      <div class="results-table-wrap" id="results-wrap">
+        <div style="color:#6b8096;padding:20px;text-align:center">
+          Load a GPX route and click <strong>Find Best Departure</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- tide chart modal -->
+<div id="tide-chart-modal" onclick="closeTideChart(event)">
+  <div id="tide-chart-box">
+    <h4 id="tide-chart-title">Tidal curve</h4>
+    <canvas id="tide-chart-canvas" height="180"></canvas>
+    <button class="btn btn-ghost btn-sm" style="margin-top:12px" onclick="closeTideChart()">Close</button>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="/static/app.js?v=4"></script>
+</body>
+</html>

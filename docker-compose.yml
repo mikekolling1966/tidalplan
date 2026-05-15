@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  tidalrouter:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    volumes:
+      # Persist any cached data
+      - ./data:/app/data:ro
+    # On the RPi, Signal K typically runs on the host network
+    # Uncomment to allow reaching host services:
+    # network_mode: host
+    # If not using host networking, point SIGNALK_HOST to host gateway:
+    environment:
+      - SIGNALK_HOST=${SIGNALK_HOST:-host-gateway}
+    extra_hosts:
+      - "host-gateway:host-gateway"
