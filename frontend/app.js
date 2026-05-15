@@ -136,6 +136,89 @@ function updateDrawRoute() {
   routeLayer = L.polyline(coords, { color: '#1a6b7a', weight: 3 }).addTo(map);
 }
 
+// ── CMEMS status ──────────────────────────────────────────────────────
+async function checkCmemsStatus() {
+  const badge  = document.getElementById('cmems-badge');
+  const detail = document.getElementById('cmems-detail');
+  try {
+    const r = await fetch('/api/tides/cmems/status');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+
+    if (d.available) {
+      badge.className = 'cmems-badge cmems-active';
+      badge.querySelector('.cmems-label').textContent = 'CMEMS model active';
+      const from = d.forecast_start ? fmtDt(d.forecast_start) : '—';
+      const to   = d.forecast_end   ? fmtDt(d.forecast_end)   : '—';
+      const age  = d.age_hours != null ? `${d.age_hours.toFixed(1)}h old` : '';
+      detail.innerHTML = `1.5 km hydrodynamic model<br>${from} → ${to}<br>${age}`;
+    } else {
+      badge.className = 'cmems-badge cmems-fallback';
+      badge.querySelector('.cmems-label').textContent = 'Station fallback';
+      detail.textContent = d.reason || 'CMEMS data not loaded — using tidal stream atlas estimates.';
+    }
+  } catch {
+    badge.className = 'cmems-badge cmems-error';
+    badge.querySelector('.cmems-label').textContent = 'Status unknown';
+    detail.textContent = 'Could not reach status endpoint.';
+  }
+}
+checkCmemsStatus();
+
+// ── drag-to-resize results panel ──────────────────────────────────────
+(function initResizeHandle() {
+  const handle = document.getElementById('results-resize-handle');
+  const panel  = document.getElementById('results-panel');
+  if (!handle || !panel) return;
+
+  let startY = 0, startH = 0;
+
+  handle.addEventListener('mousedown', e => {
+    e.preventDefault();
+    startY = e.clientY;
+    startH = panel.offsetHeight;
+    handle.classList.add('dragging');
+
+    function onMove(ev) {
+      // dragging up increases height (panel is at bottom, growing upwards)
+      const delta = startY - ev.clientY;
+      const minH = parseInt(getComputedStyle(panel).minHeight) || 120;
+      const maxH = Math.round(window.innerHeight * 0.7);
+      panel.style.height = Math.min(maxH, Math.max(minH, startH + delta)) + 'px';
+    }
+    function onUp() {
+      handle.classList.remove('dragging');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  // Touch support
+  handle.addEventListener('touchstart', e => {
+    const touch = e.touches[0];
+    startY = touch.clientY;
+    startH = panel.offsetHeight;
+    handle.classList.add('dragging');
+
+    function onMove(ev) {
+      const t = ev.touches[0];
+      const delta = startY - t.clientY;
+      const minH = parseInt(getComputedStyle(panel).minHeight) || 120;
+      const maxH = Math.round(window.innerHeight * 0.7);
+      panel.style.height = Math.min(maxH, Math.max(minH, startH + delta)) + 'px';
+    }
+    function onEnd() {
+      handle.classList.remove('dragging');
+      handle.removeEventListener('touchmove', onMove);
+      handle.removeEventListener('touchend', onEnd);
+    }
+    handle.addEventListener('touchmove', onMove, { passive: true });
+    handle.addEventListener('touchend', onEnd);
+  }, { passive: true });
+})();
+
 // ── Signal K ──────────────────────────────────────────────────────────────
 async function fetchVessel() {
   try {
@@ -316,9 +399,15 @@ function renderSortedTable(results) {
     const dur = `${Math.floor(w.passage_hours)}h ${Math.round((w.passage_hours % 1) * 60)}m`;
     const sc  = scoreBadge(w.score_label);
     const bar = scoreBar(w.score);
-    const legInfo = w.legs.map(l =>
-      `Leg ${l.leg}: ${l.distance_nm}nm ${l.heading.toFixed(0)}° — ${l.stream_component_kt >= 0 ? '↑' : '↓'} ${Math.abs(l.stream_component_kt).toFixed(1)}kt (${l.station})`
-    ).join('\n');
+    const legInfo = w.legs.map(l => {
+      const dir  = l.stream_component_kt >= 0 ? '↑' : '↓';
+      const src  = l.source === 'cmems'
+        ? '📡 CMEMS model'
+        : l.source && l.source.startsWith('station:')
+          ? `📍 ${l.source.slice(8)}`
+          : l.station || '—';
+      return `Leg ${l.leg}: ${l.distance_nm}nm ${l.heading.toFixed(0)}°  ${dir} ${Math.abs(l.stream_component_kt).toFixed(1)}kt  [${src}]`;
+    }).join('\n');
     // store original result index for selectRow
     const origIdx = lastResults.results.indexOf(w);
     return `<tr data-idx="${origIdx}" onclick="selectRow(${origIdx})" title="${legInfo}">

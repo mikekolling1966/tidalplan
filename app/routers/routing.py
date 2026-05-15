@@ -77,6 +77,7 @@ async def analyse(
                         "stream_dir": l.stream_direction,
                         "stream_component_kt": l.stream_component,
                         "station": l.station_name,
+                        "source": l.stream_source,
                     }
                     for l in w.legs
                 ],

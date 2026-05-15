@@ -153,12 +153,46 @@ input:focus, select:focus { outline: none; border-color: var(--teal); background
 
 /* ── results panel ────────────────────────────────────────────────────── */
 .results-panel {
-  height: 260px;
+  height: 300px;
+  min-height: 120px;
+  max-height: 70vh;
   background: var(--panel);
   border-top: 2px solid var(--border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  flex-shrink: 0;
+}
+
+/* drag-to-resize handle sits above the results header */
+.results-resize-handle {
+  height: 6px;
+  background: var(--border);
+  cursor: ns-resize;
+  flex-shrink: 0;
+  transition: background .15s;
+  position: relative;
+}
+.results-resize-handle::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 1px;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--muted);
+  opacity: 0.5;
+}
+.results-resize-handle:hover,
+.results-resize-handle.dragging {
+  background: var(--teal);
+}
+.results-resize-handle:hover::before,
+.results-resize-handle.dragging::before {
+  opacity: 1;
+  background: #fff;
 }
 
 .results-header {
@@ -281,9 +315,38 @@ tbody td { padding: 7px 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
+/* ── CMEMS status badge ───────────────────────────────────────────────── */
+.cmems-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+.cmems-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.cmems-checking  { background: var(--light); color: var(--muted); border-color: var(--border); }
+.cmems-checking .cmems-dot  { background: var(--muted); animation: pulse 1.4s ease-in-out infinite; }
+.cmems-active    { background: #d4edda; color: #155724; border-color: #b8ddc1; }
+.cmems-active .cmems-dot    { background: #27ae60; }
+.cmems-fallback  { background: #fff3cd; color: #856404; border-color: #ffe49c; }
+.cmems-fallback .cmems-dot  { background: var(--warn); }
+.cmems-error     { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+.cmems-error .cmems-dot     { background: var(--danger); }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
 /* ── responsive ──────────────────────────────────────────────────────── */
 @media (max-width: 700px) {
   .sidebar { width: 100%; height: auto; max-height: 45vh; }
   .app-body { flex-direction: column; }
-  .results-panel { height: 220px; }
+  .results-panel { height: 220px; min-height: 100px; }
 }
