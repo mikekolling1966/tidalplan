@@ -450,6 +450,9 @@ async function runAnalysis() {
     const data = await response.json();
     lastResults = data;
     renderResults(data);
+    if (data.warnings && data.warnings.length) {
+      data.warnings.forEach(w => toast(`⚠️ ${w}`, ''));
+    }
     toast(`Analysis complete — ${data.results.length} windows ranked`, 'success');
 
   } catch (err) {

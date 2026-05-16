@@ -46,7 +46,7 @@ async def analyse(
 
     waypoints = [(wp.lat, wp.lon) for wp in route.waypoints]
 
-    windows = await analyse_route(
+    windows, warnings = await analyse_route(
         waypoints=waypoints,
         vessel_speed_knots=vessel_speed,
         start_dt=start_dt,
@@ -59,6 +59,7 @@ async def analyse(
         "route_name": route.name,
         "waypoint_count": len(waypoints),
         "windows_tested": int((end_dt - start_dt).total_seconds() / 60 / interval_minutes) + 1,
+        "warnings": warnings,
         "results": [
             {
                 "rank": i + 1,
@@ -110,11 +111,12 @@ async def analyse_json(body: dict):
     if len(waypoints) < 2:
         raise HTTPException(400, "Need at least 2 waypoints.")
 
-    windows = await analyse_route(waypoints, vessel_speed, start_dt, end_dt, interval_minutes, top_n)
+    windows, warnings = await analyse_route(waypoints, vessel_speed, start_dt, end_dt, interval_minutes, top_n)
 
     return {
         "waypoint_count": len(waypoints),
         "windows_tested": int((end_dt - start_dt).total_seconds() / 60 / interval_minutes) + 1,
+        "warnings": warnings,
         "results": [
             {
                 "rank": i + 1,
