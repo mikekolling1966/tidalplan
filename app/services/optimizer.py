@@ -158,7 +158,7 @@ async def analyse_route(
     end_dt: datetime,
     interval_minutes: int = 30,
     top_n: int = 20,
-) -> tuple[list[DepartureWindow], list[str]]:
+) -> list[DepartureWindow]:
     """
     Test departure windows every interval_minutes between start_dt and end_dt.
     Returns top_n windows ranked by score (best first).
@@ -199,25 +199,6 @@ async def analyse_route(
     results = await _asyncio.gather(*[_fetch(sid) for sid in unique_ukho])
     for sid, events in results:
         ukho_events_cache[sid] = events
-
-    # For UKHO legs with no events (date beyond API's 6-day window), substitute
-    # the nearest TICON-4 station whose harmonics work for any date.
-    warnings: list[str] = []
-    ukho_fallback_used = False
-    for i, station in enumerate(leg_stations):
-        if station and station.get("source") == "ukho":
-            sid = station.get("id", "")
-            if not ukho_events_cache.get(sid):
-                fallback = _find_nearest_station(leg_mids[i][0], leg_mids[i][1], ticon_stations)
-                if fallback:
-                    leg_stations[i] = fallback
-                    ukho_fallback_used = True
-    if ukho_fallback_used:
-        warnings.append(
-            "Date range is beyond the UKHO API's 6-day forecast window. "
-            "Tidal streams estimated using nearest TICON-4 harmonic station "
-            "(French/Belgian ports). Phase should be reasonable; magnitudes are approximate."
-        )
 
     # Iterate departure windows
     results: list[DepartureWindow] = []
@@ -305,4 +286,4 @@ async def analyse_route(
         t_dep += dt_step
 
     results.sort(key=lambda w: w.score, reverse=True)
-    return results[:top_n], warnings
+    return results[:top_n]

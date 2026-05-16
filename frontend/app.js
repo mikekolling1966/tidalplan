@@ -19,15 +19,26 @@ let lastResults   = null;
 let selectedRow   = -1;
 let tideChartInst = null;
 
-// ── default datetime (now → now+7d) ──────────────────────────────────────
+// ── default datetime + 6-day cap ─────────────────────────────────────────
+const MAX_FORECAST_DAYS = 6;
+
 (function initDatetimes() {
   const pad = n => String(n).padStart(2, '0');
-  const fmtDay = d => `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;
-  // Default: tomorrow midnight UTC to tomorrow 23:30 UTC
+  const fmtLocal = d => `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+
   const tomorrow = new Date(Date.now() + 86400e3);
-  const day = fmtDay(tomorrow);
-  document.getElementById('start-dt').value = `${day}T00:00`;
-  document.getElementById('end-dt').value   = `${day}T23:30`;
+  const maxDt    = new Date(Date.now() + MAX_FORECAST_DAYS * 86400e3);
+  const maxStr   = fmtLocal(maxDt);
+
+  const startEl = document.getElementById('start-dt');
+  const endEl   = document.getElementById('end-dt');
+
+  startEl.max = maxStr;
+  endEl.max   = maxStr;
+
+  const day = `${tomorrow.getUTCFullYear()}-${pad(tomorrow.getUTCMonth()+1)}-${pad(tomorrow.getUTCDate())}`;
+  startEl.value = `${day}T00:00`;
+  endEl.value   = `${day}T23:30`;
 })();
 
 // ── toast ─────────────────────────────────────────────────────────────────
@@ -402,6 +413,12 @@ async function runAnalysis() {
   const endRaw   = document.getElementById('end-dt').value;
   if (!startRaw || !endRaw) { toast('Please set departure window dates.', 'error'); return; }
 
+  const maxAllowed = new Date(Date.now() + MAX_FORECAST_DAYS * 86400e3);
+  if (new Date(startRaw) > maxAllowed || new Date(endRaw) > maxAllowed) {
+    toast(`Dates must be within ${MAX_FORECAST_DAYS} days — tidal data (UKHO) only extends that far ahead.`, 'error');
+    return;
+  }
+
   const btn = document.getElementById('analyse-btn');
   btn.disabled = true;
   btn.textContent = '⏳ Analysing…';
@@ -450,9 +467,6 @@ async function runAnalysis() {
     const data = await response.json();
     lastResults = data;
     renderResults(data);
-    if (data.warnings && data.warnings.length) {
-      data.warnings.forEach(w => toast(`⚠️ ${w}`, ''));
-    }
     toast(`Analysis complete — ${data.results.length} windows ranked`, 'success');
 
   } catch (err) {
