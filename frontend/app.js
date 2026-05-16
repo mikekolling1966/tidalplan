@@ -12,6 +12,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 let routeLayer    = null;
 let stationLayer  = L.layerGroup().addTo(map);
 let drawMarkers   = [];
+let gpxCoords     = [];
 let isDrawing     = false;
 let allStations   = [];
 let lastResults   = null;
@@ -80,6 +81,7 @@ function previewGpxOnMap(gpxText) {
   }
   if (coords.length < 2) { toast('GPX has fewer than 2 points — nothing to show.', 'error'); return; }
 
+  gpxCoords = coords;
   routeLayer = L.polyline(coords, { color: '#1a6b7a', weight: 3, opacity: .9 }).addTo(map);
   coords.forEach((c, i) => {
     const icon = L.divIcon({
@@ -97,12 +99,37 @@ function clearRoute() {
   if (routeLayer) { map.eachLayer(l => { if (l instanceof L.Polyline || (l instanceof L.Marker && !l._isStation)) map.removeLayer(l); }); routeLayer = null; }
   drawMarkers.forEach(m => map.removeLayer(m));
   drawMarkers = [];
+  gpxCoords = [];
   loadedGpxFile = null;
   document.getElementById('gpx-filename').textContent = '';
   document.getElementById('results-wrap').innerHTML = '<div style="color:#6b8096;padding:20px;text-align:center">Load a GPX route and click <strong>Find Best Departure</strong></div>';
   document.getElementById('results-meta').textContent = 'No analysis run yet';
   document.getElementById('export-btn').style.display = 'none';
   lastResults = null;
+}
+
+function reverseRoute() {
+  if (gpxCoords.length >= 2) {
+    gpxCoords.reverse();
+    map.eachLayer(l => { if (l instanceof L.Polyline || (l instanceof L.Marker && !l._isStation)) map.removeLayer(l); });
+    routeLayer = L.polyline(gpxCoords, { color: '#1a6b7a', weight: 3, opacity: .9 }).addTo(map);
+    gpxCoords.forEach((c, i) => {
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="width:10px;height:10px;border-radius:50%;background:${i===0?'#00c9a7':i===gpxCoords.length-1?'#e74c3c':'#1a6b7a'};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
+        iconAnchor: [5, 5],
+      });
+      L.marker(c, { icon }).addTo(map);
+    });
+    loadedGpxFile = null;
+    toast('Route reversed', 'success');
+  } else if (drawMarkers.length >= 2) {
+    drawMarkers.reverse();
+    updateDrawRoute();
+    toast('Route reversed', 'success');
+  } else {
+    toast('No route to reverse.', 'error');
+  }
 }
 
 // ── draw mode ─────────────────────────────────────────────────────────────
@@ -134,6 +161,77 @@ function updateDrawRoute() {
   if (drawMarkers.length < 2) return;
   const coords = drawMarkers.map(m => [m.getLatLng().lat, m.getLatLng().lng]);
   routeLayer = L.polyline(coords, { color: '#1a6b7a', weight: 3 }).addTo(map);
+}
+
+// ── Wind GRIB ─────────────────────────────────────────────────────────────
+const gribDropZone = document.getElementById('grib-drop-zone');
+const gribInput    = document.getElementById('grib-input');
+
+gribDropZone.addEventListener('dragover', e => { e.preventDefault(); gribDropZone.classList.add('active'); });
+gribDropZone.addEventListener('dragleave', () => gribDropZone.classList.remove('active'));
+gribDropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  gribDropZone.classList.remove('active');
+  const file = e.dataTransfer.files[0];
+  if (file) uploadWindGrib(file);
+});
+gribInput.addEventListener('change', () => { if (gribInput.files[0]) uploadWindGrib(gribInput.files[0]); });
+
+async function uploadWindGrib(file) {
+  document.getElementById('grib-filename').textContent = file.name;
+  setWindBadge('checking', 'Uploading…');
+  document.getElementById('wind-detail').textContent = '';
+
+  const fd = new FormData();
+  fd.append('grib_file', file);
+  try {
+    const r = await fetch('/api/wind/upload', { method: 'POST', body: fd });
+    if (!r.ok) { const e = await r.json(); throw new Error(e.detail || r.statusText); }
+    const d = await r.json();
+    setWindBadge('active', 'Wind data loaded');
+    document.getElementById('wind-detail').innerHTML =
+      `${d.steps} time steps<br>${d.time_start} → ${d.time_end}`;
+    document.getElementById('clear-wind-btn').style.display = '';
+    toast(`Wind GRIB loaded — ${d.steps} steps`, 'success');
+  } catch (err) {
+    setWindBadge('error', 'Load failed');
+    document.getElementById('wind-detail').textContent = err.message;
+    document.getElementById('grib-filename').textContent = '';
+    toast(`Wind GRIB error: ${err.message}`, 'error');
+  }
+}
+
+function setWindBadge(cls, label) {
+  document.getElementById('wind-badge').className = `cmems-badge cmems-${cls}`;
+  document.getElementById('wind-badge-label').textContent = label;
+}
+
+async function clearWindGrib() {
+  await fetch('/api/wind/clear', { method: 'DELETE' });
+  document.getElementById('grib-filename').textContent = '';
+  document.getElementById('wind-detail').textContent = '';
+  document.getElementById('clear-wind-btn').style.display = 'none';
+  setWindBadge('fallback', 'No wind data loaded');
+  toast('Wind data cleared', '');
+}
+
+async function checkWindStatus() {
+  try {
+    const r = await fetch('/api/wind/status');
+    const d = await r.json();
+    if (d.loaded) {
+      setWindBadge('active', 'Wind data loaded');
+      document.getElementById('wind-detail').innerHTML =
+        `${d.steps} time steps<br>${d.time_start} → ${d.time_end}`;
+      document.getElementById('clear-wind-btn').style.display = '';
+    }
+  } catch { /* server may not have cfgrib — badge stays at default */ }
+}
+checkWindStatus();
+
+function degreesToCompass(deg) {
+  const pts = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+  return pts[Math.round(deg / 22.5) % 16];
 }
 
 // ── CMEMS status ──────────────────────────────────────────────────────
@@ -325,8 +423,10 @@ async function runAnalysis() {
       fd.append('top_n', document.getElementById('top-n').value);
       response = await fetch('/api/route/analyse', { method: 'POST', body: fd });
     } else {
-      // Use drawn waypoints via JSON endpoint
-      const coords = drawMarkers.map(m => [m.getLatLng().lat, m.getLatLng().lng]);
+      // Use drawn waypoints or reversed-GPX coords via JSON endpoint
+      const coords = drawMarkers.length > 0
+        ? drawMarkers.map(m => [m.getLatLng().lat, m.getLatLng().lng])
+        : gpxCoords;
       if (coords.length < 2) { toast('Draw at least 2 waypoints.', 'error'); return; }
       response = await fetch('/api/route/analyse-json', {
         method: 'POST',
@@ -400,10 +500,13 @@ function renderSortedTable(results) {
     const sc  = scoreBadge(w.score_label);
     const bar = scoreBar(w.score);
     const legInfo = w.legs.map(l => {
-      const dir    = l.stream_component_kt >= 0 ? '↑' : '↓';
-      const tag    = l.source === 'cmems' ? ' 📡' : '';
-      const stn    = l.station || '—';
-      return `Leg ${l.leg}: ${l.distance_nm}nm ${l.heading.toFixed(0)}°  ${dir} ${Math.abs(l.stream_component_kt).toFixed(1)}kt  (${stn}${tag})`;
+      const dir     = l.stream_component_kt >= 0 ? '↑' : '↓';
+      const tag     = l.source === 'cmems' ? ' 📡' : '';
+      const stn     = l.station || '—';
+      const windStr = (l.wind_speed_kt || 0) > 0.3
+        ? `  💨 ${degreesToCompass(l.wind_direction)} ${l.wind_speed_kt.toFixed(0)}kt`
+        : '';
+      return `Leg ${l.leg}: ${l.distance_nm}nm ${l.heading.toFixed(0)}°  ${dir} ${Math.abs(l.stream_component_kt).toFixed(1)}kt${windStr}  (${stn}${tag})`;
     }).join('\n');
     // store original result index for selectRow
     const origIdx = lastResults.results.indexOf(w);

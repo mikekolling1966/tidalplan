@@ -8,7 +8,7 @@ import asyncio
 import logging
 import os
 
-from app.routers import tides, routing, vessel
+from app.routers import tides, routing, vessel, wind
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +59,7 @@ app.add_middleware(NoCacheStaticMiddleware)
 app.include_router(tides.router,   prefix="/api/tides",   tags=["tides"])
 app.include_router(routing.router, prefix="/api/route",   tags=["routing"])
 app.include_router(vessel.router,  prefix="/api/vessel",  tags=["vessel"])
+app.include_router(wind.router,    prefix="/api/wind",    tags=["wind"])
 
 frontend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
 app.mount("/static", StaticFiles(directory=frontend_dir), name="static")

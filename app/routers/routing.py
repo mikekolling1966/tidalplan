@@ -78,6 +78,8 @@ async def analyse(
                         "stream_component_kt": l.stream_component,
                         "station": l.station_name,
                         "source": l.stream_source,
+                        "wind_speed_kt": l.wind_speed_kt,
+                        "wind_direction": l.wind_direction,
                     }
                     for l in w.legs
                 ],

@@ -126,6 +126,8 @@ class LegResult:
     stream_component: float  # + = fair, - = foul
     station_name: str
     stream_source: str = "unknown"  # "cmems" or "station:<name>"
+    wind_speed_kt: float = 0.0
+    wind_direction: float = 0.0   # degrees FROM (meteorological)
 
 
 @dataclass
@@ -227,6 +229,15 @@ async def analyse_route(
             leg_hours = dist_nm / eff_speed
             current_time += timedelta(hours=leg_hours)
 
+            wind_kt, wind_dir = 0.0, 0.0
+            try:
+                from app.services import grib_wind
+                wind = grib_wind.get_wind(mlat, mlon, current_time)
+                if wind:
+                    wind_kt, wind_dir = wind
+            except Exception:
+                pass
+
             legs.append(LegResult(
                 leg_index=i,
                 distance_nm=round(dist_nm, 2),
@@ -237,6 +248,8 @@ async def analyse_route(
                 stream_component=round(component, 2),
                 station_name=sname,
                 stream_source=ssrc,
+                wind_speed_kt=round(wind_kt, 1),
+                wind_direction=round(wind_dir, 1),
             ))
 
             if component >= 0:

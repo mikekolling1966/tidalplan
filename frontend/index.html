@@ -36,7 +36,26 @@
       <input type="file" id="gpx-input" accept=".gpx" style="display:none">
       <div class="btn-row">
         <button class="btn btn-ghost btn-sm" onclick="clearRoute()">Clear route</button>
+        <button class="btn btn-ghost btn-sm" onclick="reverseRoute()">⇄ Reverse</button>
         <button class="btn btn-ghost btn-sm" onclick="toggleDrawMode()" id="draw-btn">✏️ Draw</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Wind forecast (GRIB)</h2>
+      <div class="drop-zone" id="grib-drop-zone" onclick="document.getElementById('grib-input').click()">
+        <div class="dz-icon">💨</div>
+        <p>Drop GRIB file here or <strong>click to browse</strong></p>
+        <p id="grib-filename" style="color:#1a6b7a;margin-top:4px;font-weight:600"></p>
+      </div>
+      <input type="file" id="grib-input" accept=".grb,.grib,.grib2,.grb2" style="display:none">
+      <div id="wind-badge" class="cmems-badge cmems-fallback">
+        <span class="cmems-dot"></span>
+        <span id="wind-badge-label">No wind data loaded</span>
+      </div>
+      <div id="wind-detail" style="font-size:11px;color:#6b8096;margin-top:6px;line-height:1.5"></div>
+      <div class="btn-row" style="margin-top:6px">
+        <button class="btn btn-ghost btn-sm" onclick="clearWindGrib()" id="clear-wind-btn" style="display:none">Clear wind</button>
       </div>
     </section>
 
