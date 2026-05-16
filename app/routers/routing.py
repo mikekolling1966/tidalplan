@@ -123,7 +123,22 @@ async def analyse_json(body: dict):
                 "passage_hours": w.passage_hours,
                 "score": w.score,
                 "score_label": w.score_label,
-                "legs": [vars(l) for l in w.legs],
+                "legs": [
+                    {
+                        "leg": l.leg_index + 1,
+                        "distance_nm": l.distance_nm,
+                        "heading": l.heading,
+                        "duration_hours": l.duration_hours,
+                        "stream_speed_kt": l.stream_speed,
+                        "stream_dir": l.stream_direction,
+                        "stream_component_kt": l.stream_component,
+                        "station": l.station_name,
+                        "source": l.stream_source,
+                        "wind_speed_kt": l.wind_speed_kt,
+                        "wind_direction": l.wind_direction,
+                    }
+                    for l in w.legs
+                ],
             }
             for i, w in enumerate(windows)
         ],
