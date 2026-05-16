@@ -20,7 +20,7 @@ let selectedRow   = -1;
 let tideChartInst = null;
 
 // ── default datetime + 6-day cap ─────────────────────────────────────────
-const MAX_FORECAST_DAYS = 6;
+const MAX_FORECAST_DAYS = 7;
 
 (function initDatetimes() {
   const pad = n => String(n).padStart(2, '0');
@@ -415,7 +415,7 @@ async function runAnalysis() {
 
   const maxAllowed = new Date(Date.now() + MAX_FORECAST_DAYS * 86400e3);
   if (new Date(startRaw) > maxAllowed || new Date(endRaw) > maxAllowed) {
-    toast(`Dates must be within ${MAX_FORECAST_DAYS} days — tidal data (UKHO) only extends that far ahead.`, 'error');
+    toast(`Dates must be within ${MAX_FORECAST_DAYS} days — tidal forecast data only extends that far ahead.`, 'error');
     return;
   }
 
