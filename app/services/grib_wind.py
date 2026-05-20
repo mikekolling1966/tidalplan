@@ -45,8 +45,13 @@ def _lon_coord(ds):
 
 
 def _time_dim(ds):
-    for n in ["valid_time", "time"]:
+    # cfgrib often uses "step" as the primary time dimension
+    for n in ["valid_time", "time", "step"]:
         if n in ds.dims:
+            return n
+    # Scalar coordinate — single time step
+    for n in ["valid_time", "time"]:
+        if n in ds.coords:
             return n
     return None
 
@@ -123,7 +128,14 @@ def _build_summary(ds) -> dict:
     lon = _lon_coord(ds)
     tname = _time_dim(ds)
 
-    times = ds[tname].values if tname else []
+    if tname == "step" and "valid_time" in ds.coords:
+        import numpy as _np2
+        times = _np2.atleast_1d(ds["valid_time"].values)
+    elif tname:
+        import numpy as _np2
+        times = _np2.atleast_1d(ds[tname].values)
+    else:
+        times = []
     t0 = str(times[0])[:16].replace("T", " ") + " UTC" if len(times) else "—"
     t1 = str(times[-1])[:16].replace("T", " ") + " UTC" if len(times) else "—"
 
@@ -181,9 +193,17 @@ def get_wind(lat: float, lon: float, t: datetime) -> Optional[Tuple[float, float
             sel_kwargs[lon_c] = lon
         point = _ds.sel(sel_kwargs, method="nearest")
 
-        # Nearest time step
+        # Nearest time step -- cfgrib uses "step" dim, "valid_time" as coord
         if tname and tname in point.dims:
-            point = point.sel({tname: t_np}, method="nearest")
+            if tname == "step" and "valid_time" in point.coords:
+                vt_vals = np.atleast_1d(point["valid_time"].values)
+                idx = int(np.argmin(np.abs(vt_vals - t_np)))
+                point = point.isel({tname: idx})
+            else:
+                try:
+                    point = point.sel({tname: t_np}, method="nearest")
+                except Exception:
+                    point = point.isel({tname: 0})
 
         u = float(np.asarray(point[u_var]).flat[0])   # eastward  m/s
         v = float(np.asarray(point[v_var]).flat[0])   # northward m/s
@@ -191,7 +211,14 @@ def get_wind(lat: float, lon: float, t: datetime) -> Optional[Tuple[float, float
         if math.isnan(u) or math.isnan(v):
             return None
 
-        speed_kt = math.sqrt(u ** 2 + v ** 2) * 1.94384
+        # Determine unit conversion: most models use m/s (multiply by 1.944 to get knots)
+        # Some commercial GRIBs (e.g. METEOCONSULT) store values already in knots
+        u_units = str(_ds[u_var].attrs.get("units", "m s**-1")).lower()
+        if "knot" in u_units or u_units in ("kt", "kts", "kn"):
+            ms_to_kt = 1.0   # already in knots
+        else:
+            ms_to_kt = 1.94384  # m/s → knots
+        speed_kt = math.sqrt(u ** 2 + v ** 2) * ms_to_kt
         # atan2(-u, -v) gives the direction wind is coming FROM
         direction_from = (math.degrees(math.atan2(-u, -v)) + 360) % 360
 

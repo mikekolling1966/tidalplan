@@ -25,6 +25,7 @@ Designed to run on a Raspberry Pi alongside Signal K and be accessible from any 
 | 🏅 **Scoring & rating** | Each departure scored 0–100 (Excellent / Good / Fair / Poor) |
 | 📊 **Sortable table** | Sort by duration, departure time, ETA or tidal score |
 | 📥 **CSV export** | Download the full results table |
+| 🌬️ **GRIB wind overlay** | Upload any GRIB file (GFS, ECMWF, METEOCONSULT, etc.) -- wind speed and direction shown per leg in the departure analysis. Supports multi-step forecasts with correct per-leg time interpolation |
 | 🟢 **Live data source badge** | Sidebar shows whether CMEMS model data or station fallback is active |
 | 📐 **Resizable results panel** | Drag the grip bar to make the results table as tall as you need |
 
@@ -244,6 +245,9 @@ The FastAPI backend exposes these endpoints (auto-documented at `/docs`):
 | `GET` | `/api/tides/cmems/status` | CMEMS data status — forecast window, age, bounding box |
 | `POST` | `/api/tides/cmems/refresh` | Trigger a manual CMEMS re-download |
 | `GET` | `/api/vessel/position` | Signal K vessel position (if available) |
+| `POST` | `/api/wind/upload` | Upload a GRIB wind forecast file (multipart/form-data, field `grib_file`) |
+| `GET` | `/api/wind/status` | GRIB status -- loaded flag, variable names, step count, time range, bounding box |
+| `DELETE` | `/api/wind/clear` | Remove the loaded GRIB from server memory |
 
 ---
 
@@ -264,7 +268,8 @@ tidalplan/
 │       ├── harmonics.py         # TICON-4 tidal harmonic prediction engine
 │       ├── gpx_parser.py        # Robust GPX parser (handles OpenCPN namespaces)
 │       ├── optimizer.py         # Departure window scoring and ranking engine
-│       └── stream_directions.py # Flood/ebb directions from NP249/250/251/233 atlases
+│       ├── stream_directions.py # Flood/ebb directions from NP249/250/251/233 atlases
+│       └── grib_wind.py         # GRIB wind upload, caching and per-leg time-interpolated lookup
 ├── data/
 │   ├── ticon4_channel.json      # TICON-4 harmonic constants for 13 Channel/NS stations
 │   └── ukho_stations_cache.json # UKHO station list (auto-generated, git-ignored)
@@ -281,6 +286,30 @@ tidalplan/
 ```
 
 ---
+
+## GRIB wind data
+
+TidalPlan accepts any GRIB1/GRIB2 wind forecast file. Upload via the web app drag-and-drop
+area or the OpenCPN TidalPlan plugin **Load GRIB...** button (which POSTs directly to
+`/api/wind/upload`).
+
+**Supported models:** GFS, ECMWF, UKMO, METEOCONSULT, and any file containing 10 m U/V
+wind components (`u10`/`v10` or `UGRD`/`VGRD`).
+
+**Multi-step forecasts** are fully supported. Wind speed and direction are interpolated to
+the estimated arrival time at each leg midpoint, so a 7-day hourly GRIB gives time-accurate
+conditions for every leg of the passage. METEOCONSULT and similar commercial files with
+`step` as the primary time dimension are handled correctly via `valid_time` coordinate lookup.
+
+**Units:** standard WMO m/s. If the `units` attribute indicates knots the m/s conversion is
+skipped automatically.
+
+The GRIB is held in memory and cleared on server restart. To check status:
+
+```bash
+curl http://localhost:8081/api/wind/status
+```
+
 
 ## Updating
 
