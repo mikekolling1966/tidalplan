@@ -8,7 +8,9 @@ Designed to run on a Raspberry Pi alongside Signal K and be accessible from any 
 
 ## Screenshot
 
-![TidalPlan UI showing the map, sidebar controls, and ranked results table](docs/screenshot.png)
+![TidalPlan OpenCPN plugin showing departure window analysis and leg detail popup on a Thames Estuary route](docs/screenshot.jpg)
+
+*The TidalPlan OpenCPN plugin connected to this server — 48 departure windows tested for a route near Sunk Head, Thames Estuary. Leg detail shows tidal stream from the CMEMS 1.5 km hydrodynamic model.*
 
 ---
 
