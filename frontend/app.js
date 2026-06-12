@@ -18,6 +18,7 @@ let allStations   = [];
 let lastResults   = null;
 let selectedRow   = -1;
 let tideChartInst = null;
+let currentDepWindow = null;
 
 // ── default datetime + 6-day cap ─────────────────────────────────────────
 const MAX_FORECAST_DAYS = 7;
@@ -568,7 +569,6 @@ function selectRow(idx) {
   selectedRow = idx;
   document.querySelectorAll('tbody tr').forEach((r, i) => r.classList.toggle('selected', i === idx));
   const w = lastResults.results[idx];
-  // Highlight tidal stations used in this window's legs
   const stationNames = new Set(w.legs.map(l => l.station));
   stationLayer.eachLayer(m => {
     if (m._popup) {
@@ -576,6 +576,95 @@ function selectRow(idx) {
       m.setOpacity(stationNames.has(name) ? 1.0 : 0.4);
     }
   });
+  showDepModal(w);
+}
+
+function showDepModal(w) {
+  currentDepWindow = w;
+  document.getElementById('dep-time').textContent  = fmtDt(w.departure);
+  document.getElementById('dep-eta').textContent   = fmtDt(w.eta);
+  const dur = `${Math.floor(w.passage_hours)}h ${Math.round((w.passage_hours % 1) * 60)}m`;
+  document.getElementById('dep-dur').textContent   = dur;
+  document.getElementById('dep-score').textContent = `${w.score} (${w.score_label})`;
+
+  document.getElementById('dep-leg-tbody').innerHTML = w.legs.map(l => {
+    const fair    = l.stream_component_kt >= 0;
+    const windStr = (l.wind_speed_kt || 0) > 0.3
+      ? `${degreesToCompass(l.wind_direction)} ${l.wind_speed_kt.toFixed(0)}kt` : '—';
+    return `<tr>
+      <td>${l.leg}</td>
+      <td>${l.distance_nm} nm</td>
+      <td>${l.heading.toFixed(0)}°</td>
+      <td>${Math.abs(l.stream_component_kt).toFixed(1)} kt</td>
+      <td class="${fair ? 'dep-fair' : 'dep-foul'}">${fair ? 'Fair' : 'Foul'}</td>
+      <td>${windStr}</td>
+      <td>${l.station || '—'}</td>
+      <td>${l.source === 'cmems' ? 'CMEMS' : 'UKHO'}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('dep-modal').classList.add('open');
+}
+
+function closeDepModal(e) {
+  if (e && e.target !== document.getElementById('dep-modal')) return;
+  document.getElementById('dep-modal').classList.remove('open');
+}
+
+function printDeparture() {
+  if (!currentDepWindow) return;
+  const w   = currentDepWindow;
+  const dur = `${Math.floor(w.passage_hours)}h ${Math.round((w.passage_hours % 1) * 60)}m`;
+
+  const legsHtml = w.legs.map(l => {
+    const fair    = l.stream_component_kt >= 0;
+    const windStr = (l.wind_speed_kt || 0) > 0.3
+      ? `${degreesToCompass(l.wind_direction)} ${l.wind_speed_kt.toFixed(0)}kt` : '—';
+    return `<tr style="${fair ? '' : 'background:#fff5f5'}">
+      <td>${l.leg}</td>
+      <td>${l.distance_nm} nm</td>
+      <td>${l.heading.toFixed(0)}°</td>
+      <td>${Math.abs(l.stream_component_kt).toFixed(1)} kt (${fair ? 'Fair' : 'Foul'})</td>
+      <td>${windStr}</td>
+      <td>${l.station || '—'}</td>
+      <td>${l.source === 'cmems' ? 'CMEMS' : 'UKHO'}</td>
+    </tr>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html><html><head>
+    <meta charset="UTF-8">
+    <title>Departure Plan — ${fmtDt(w.departure)}</title>
+    <style>
+      body{font-family:sans-serif;font-size:13px;padding:20px;color:#1a2f45}
+      h2{color:#0d2137;margin-bottom:8px}
+      .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+      .si{border:1px solid #c5d3e0;border-radius:6px;padding:8px 12px}
+      .si .lbl{font-size:10px;color:#6b8096;text-transform:uppercase}
+      .si .val{font-size:16px;font-weight:700;margin-top:2px}
+      table{width:100%;border-collapse:collapse}
+      th{background:#f0f4f8;padding:7px 10px;text-align:left;font-size:11px;text-transform:uppercase;color:#6b8096;border-bottom:1px solid #c5d3e0}
+      td{padding:7px 10px;border-bottom:1px solid #eef2f6}
+      @media print{body{padding:0}}
+    </style>
+  </head><body>
+    <h2>TidalPlan — Departure Plan</h2>
+    <p style="color:#6b8096;margin-bottom:16px">Generated ${new Date().toUTCString()}</p>
+    <div class="summary">
+      <div class="si"><div class="lbl">Departure (UTC)</div><div class="val">${fmtDt(w.departure)}</div></div>
+      <div class="si"><div class="lbl">ETA (UTC)</div><div class="val">${fmtDt(w.eta)}</div></div>
+      <div class="si"><div class="lbl">Duration</div><div class="val">${dur}</div></div>
+      <div class="si"><div class="lbl">Tidal Score</div><div class="val">${w.score} (${w.score_label})</div></div>
+    </div>
+    <table>
+      <thead><tr><th>Leg</th><th>Distance</th><th>Heading</th><th>Tidal stream</th><th>Wind</th><th>Station</th><th>Source</th></tr></thead>
+      <tbody>${legsHtml}</tbody>
+    </table>
+  </body></html>`;
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  setTimeout(() => win.print(), 400);
 }
 
 function fmtDt(iso) {

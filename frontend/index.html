@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tidal Router</title>
-<link rel="stylesheet" href="/static/style.css?v=5">
+<link rel="stylesheet" href="/static/style.css?v=6">
 <!-- Leaflet -->
 <link  rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -145,6 +145,31 @@
 
 </div>
 
+<!-- departure detail modal -->
+<div id="dep-modal" onclick="closeDepModal(event)">
+  <div id="dep-box">
+    <h3 id="dep-title">Departure Details</h3>
+    <div class="dep-summary">
+      <div class="dep-summary-item"><div class="label">Departure (UTC)</div><div class="value" id="dep-time">—</div></div>
+      <div class="dep-summary-item"><div class="label">ETA (UTC)</div><div class="value" id="dep-eta">—</div></div>
+      <div class="dep-summary-item"><div class="label">Duration</div><div class="value" id="dep-dur">—</div></div>
+      <div class="dep-summary-item"><div class="label">Tidal Score</div><div class="value" id="dep-score">—</div></div>
+    </div>
+    <table id="dep-leg-table">
+      <thead>
+        <tr>
+          <th>Leg</th><th>Distance</th><th>Heading</th><th>Tidal stream</th><th>Fair/Foul</th><th>Wind</th><th>Station</th><th>Source</th>
+        </tr>
+      </thead>
+      <tbody id="dep-leg-tbody"></tbody>
+    </table>
+    <div class="dep-actions">
+      <button class="btn btn-ghost btn-sm" onclick="printDeparture()">🖨 Print / Save PDF</button>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('dep-modal').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- tide chart modal -->
 <div id="tide-chart-modal" onclick="closeTideChart(event)">
   <div id="tide-chart-box">
@@ -156,6 +181,6 @@
 
 <div id="toast-container"></div>
 
-<script src="/static/app.js?v=5"></script>
+<script src="/static/app.js?v=6"></script>
 </body>
 </html>
